@@ -1,8 +1,0 @@
-INFO 2025-08-06 17:28:06,332 autoreload 11 281473646092320 Watching for file changes with StatReloader
-INFO 2025-08-06 17:30:06,448 autoreload 11 281473646092320 /app/transaction_system/settings.py changed, reloading.
-INFO 2025-08-06 17:30:06,678 autoreload 13 281473455026208 Watching for file changes with StatReloader
-INFO 2025-08-06 17:30:42,274 autoreload 9 281473096626208 Watching for file changes with StatReloader
-INFO 2025-08-06 17:31:43,360 autoreload 9 281473096626208 /app/transaction_system/urls.py changed, reloading.
-INFO 2025-08-06 17:31:43,564 autoreload 11 281472895905824 Watching for file changes with StatReloader
-INFO 2025-08-06 17:31:53,766 autoreload 11 281472895905824 /app/transaction_system/urls.py changed, reloading.
-INFO 2025-08-06 17:31:53,971 autoreload 13 281473749483552 Watching for file changes with StatReloader
