@@ -38,9 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'corsheaders',
-    'transactions',
-    'reports',
+    'transactions.apps.TransactionsConfig',
+    'reports.apps.ReportsConfig',
 ]
 
 MIDDLEWARE = [
