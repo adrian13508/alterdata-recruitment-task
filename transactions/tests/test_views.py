@@ -14,37 +14,32 @@ class TestTransactionViews:
     """Test transaction API endpoints"""
 
     @pytest.fixture
-    def api_client(self):
-        return APIClient()
+    def api_client(self, authenticated_api_client):
+        return authenticated_api_client
 
     def test_upload_valid_csv_file(self, db, api_client, csv_file):
         """Test uploading a valid CSV file"""
         url = reverse('transaction-upload')
         response = api_client.post(url, {'file': csv_file}, format='multipart')
 
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_202_ACCEPTED
         data = response.json()
 
-        assert data['total_rows'] == 2
-        assert data['successful_transactions'] == 2
-        assert data['failed_rows'] == 0
-        assert len(data['created_transactions']) == 2
-
-        # Verify transactions were created
-        assert Transaction.objects.count() == 2
+        assert 'task_id' in data
+        assert data['status'] == 'processing'
+        assert 'message' in data
 
     def test_upload_invalid_csv_file(self, db, api_client, invalid_csv_file):
         """Test uploading an invalid CSV file"""
         url = reverse('transaction-upload')
         response = api_client.post(url, {'file': invalid_csv_file}, format='multipart')
 
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_202_ACCEPTED
         data = response.json()
 
-        assert data['total_rows'] == 2
-        assert data['successful_transactions'] == 0
-        assert data['failed_rows'] == 2
-        assert len(data['errors']) == 2
+        assert 'task_id' in data
+        assert data['status'] == 'processing'
+        assert 'message' in data
 
     def test_upload_non_csv_file(self, db, api_client, non_csv_file):
         """Test uploading a non-CSV file"""

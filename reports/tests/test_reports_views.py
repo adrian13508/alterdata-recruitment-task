@@ -11,8 +11,8 @@ class TestReportsViews:
     """Test reports API endpoints"""
 
     @pytest.fixture
-    def api_client(self):
-        return APIClient()
+    def api_client(self, authenticated_api_client):
+        return authenticated_api_client
 
     def test_customer_summary_success(self, db, api_client, multiple_transactions):
         """Test successful customer summary generation"""

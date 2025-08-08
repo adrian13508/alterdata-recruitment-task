@@ -1,11 +1,21 @@
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
 
 import pytest
+import django
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 
+# Configure Django settings before any model imports
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'transaction_system.settings')
+django.setup()
+
+# Now we can safely import models
 from transactions.models import Transaction
+from token_auth.models import ApiToken
 
 
 @pytest.fixture
@@ -126,3 +136,59 @@ def non_csv_file():
         b"not a csv file",
         content_type="text/plain"
     )
+
+
+@pytest.fixture
+def api_token(db):
+    """Create an API token for testing"""
+    return ApiToken.objects.create(
+        name="Test Token",
+        is_active=True
+    )
+
+
+@pytest.fixture
+def authenticated_api_client(api_token):
+    """API client with authentication token"""
+    from rest_framework.test import APIClient
+    
+    class AuthenticatedAPIClient(APIClient):
+        def __init__(self, token, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.token = token
+            
+        def get(self, path, data=None, **extra):
+            if data is None:
+                data = {}
+            data['token'] = self.token
+            return super().get(path, data, **extra)
+            
+        def post(self, path, data=None, **extra):
+            if '?' in path:
+                path += f'&token={self.token}'
+            else:
+                path += f'?token={self.token}'
+            return super().post(path, data, **extra)
+            
+        def put(self, path, data=None, **extra):
+            if '?' in path:
+                path += f'&token={self.token}'
+            else:
+                path += f'?token={self.token}'
+            return super().put(path, data, **extra)
+            
+        def patch(self, path, data=None, **extra):
+            if '?' in path:
+                path += f'&token={self.token}'
+            else:
+                path += f'?token={self.token}'
+            return super().patch(path, data, **extra)
+            
+        def delete(self, path, data=None, **extra):
+            if '?' in path:
+                path += f'&token={self.token}'
+            else:
+                path += f'?token={self.token}'
+            return super().delete(path, data, **extra)
+    
+    return AuthenticatedAPIClient(api_token.token)

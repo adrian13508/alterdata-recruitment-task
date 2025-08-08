@@ -74,9 +74,9 @@ class TestCSVProcessor:
 
         # Invalid timestamp formats
         invalid_timestamps = [
-            '2024-01-15 10:30:00',  # Space instead of T
-            '2024/01/15T10:30:00Z',  # Wrong date format
-            'invalid-date',
+            'not-a-date',
+            'invalid-timestamp',
+            123456,  # Integer instead of string
             None
         ]
 

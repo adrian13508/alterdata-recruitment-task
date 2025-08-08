@@ -113,7 +113,9 @@ class TestTransactionModel:
 
         assert transaction.created_at is not None
         assert transaction.updated_at is not None
-        assert transaction.created_at == transaction.updated_at
+        # Allow small time difference due to microsecond precision
+        time_diff = abs((transaction.created_at - transaction.updated_at).total_seconds())
+        assert time_diff < 1  # Should be created within 1 second
 
         # Update the transaction
         original_created_at = transaction.created_at
