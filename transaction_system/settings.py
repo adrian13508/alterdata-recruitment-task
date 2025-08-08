@@ -11,13 +11,21 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
-from pathlib import Path
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Create logs directory if it doesn't exist
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
+# Create uploads directory if it doesn't exist
+UPLOADS_DIR = BASE_DIR / 'uploads'
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fpeg@_$*y#-)-n4b9@gye^z0rar!0*^+ay15)m=a@l-7r@o=pr')
@@ -26,7 +34,6 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fpeg@_$*y#-)-n4b9@gye^z0ra
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -38,12 +45,17 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'django_celery_results',
     'transactions.apps.TransactionsConfig',
     'reports.apps.ReportsConfig',
+    'token_auth.apps.AuthConfig'
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'utils.middleware.ApiTokenAuthentication',
+    'utils.middleware.RequestLoggingMiddleware',
+    'utils.middleware.ErrorHandlingMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -72,7 +84,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'transaction_system.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
@@ -89,7 +100,6 @@ DATABASES = {
         },
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -109,7 +119,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
@@ -121,7 +130,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -129,6 +137,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# File uploads
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -153,34 +165,140 @@ CURRENCY_EXCHANGE_RATES = {
     'PLN': 1.0,
 }
 
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_RESULT_EXPIRES = 3600  # Results expire after 1 hour
+
+# Store task results in database
+CELERY_CACHE_BACKEND = 'django-cache'
+
+# Task routing
+CELERY_TASK_ROUTES = {
+    'transactions.tasks.*': {'queue': 'transactions'},
+    'reports.tasks.*': {'queue': 'reports'},
+}
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '{levelname} {asctime} {name} {module} {process:d} {thread:d} {message}',
             'style': '{',
         },
         'simple': {
-            'format': '{levelname} {message}',
+            'format': '{levelname} {asctime} {name} {message}',
             'style': '{',
-        },
+        }
     },
     'handlers': {
-        'file': {
+        'rotating_file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': 'transaction_system.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'transaction_system.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 30,  # Keep 30 days
             'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        'error_file': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'errors.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 30,  # Keep 30 days
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        'transactions_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'transactions.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 30,  # Keep 30 days
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        'reports_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'reports.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 30,  # Keep 30 days
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
         },
         'console': {
-            'level': 'INFO',
+            'level': 'INFO' if not DEBUG else 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'debug_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(LOGS_DIR / 'debug.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 7,  # Keep debug logs for 7 days only
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['rotating_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['error_file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['debug_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'transactions': {
+            'handlers': ['transactions_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'transactions.services': {
+            'handlers': ['transactions_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'reports': {
+            'handlers': ['reports_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'utils': {
+            'handlers': ['rotating_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
     'root': {
-        'handlers': ['file', 'console'],
+        'handlers': ['error_file', 'console'],
         'level': 'INFO',
     },
 }
+
+# Additional logging settings
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+if LOG_LEVEL in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+    LOGGING['root']['level'] = LOG_LEVEL
+    for logger in LOGGING['loggers'].values():
+        logger['level'] = LOG_LEVEL if LOG_LEVEL != 'DEBUG' else 'DEBUG'
