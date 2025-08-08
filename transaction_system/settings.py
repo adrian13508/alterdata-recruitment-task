@@ -23,10 +23,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOGS_DIR = BASE_DIR / 'logs'
 LOGS_DIR.mkdir(exist_ok=True)
 
-# Create uploads directory if it doesn't exist
-UPLOADS_DIR = BASE_DIR / 'uploads'
-UPLOADS_DIR.mkdir(exist_ok=True)
-
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fpeg@_$*y#-)-n4b9@gye^z0rar!0*^+ay15)m=a@l-7r@o=pr')
 
