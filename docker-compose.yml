@@ -5,6 +5,7 @@ services:
       - "8000:8000"
     depends_on:
       - db
+      - redis
     environment:
       - DB_NAME=transactions
       - DB_USER=postgres
@@ -13,11 +14,59 @@ services:
       - DB_PORT=5432
       - DEBUG=True
       - SECRET_KEY=your-secret-key-for-development
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - .:/app
+      - ./uploads:/app/uploads
     command: >
       sh -c "python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
+
+  celery:
+    build: .
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DB_NAME=transactions
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DEBUG=True
+      - SECRET_KEY=your-secret-key-for-development
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
+    command: python -m celery -A transaction_system worker --loglevel=info
+
+  celery-beat:
+    build: .
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DB_NAME=transactions
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DEBUG=True
+      - SECRET_KEY=your-secret-key-for-development
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
+    command: python -m celery -A transaction_system beat --loglevel=info
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
 
   db:
     image: postgres:15
@@ -25,10 +74,9 @@ services:
       POSTGRES_DB: transactions
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data:
+  uploads:
